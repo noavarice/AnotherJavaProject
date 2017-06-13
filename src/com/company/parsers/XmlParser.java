@@ -11,14 +11,18 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 public class XmlParser {
+    private static final int DEFAULT_MEAN = 1000;
+
+    private static final double DEFAULT_DISPERSION_PERCENTAGE = 10.0;
+
     private static final Pattern CHECK_NAME = Pattern.compile("\\w+");
 
     private static final Set<String> ALLOWED_TYPES = new HashSet<String>() {
         {
             add("string");
             add("integer");
-            add("float");
-            add("date");
+            add("double");
+            add("boolean");
         }
     };
 
@@ -72,7 +76,25 @@ public class XmlParser {
                 columns[j] = new SqlColumn(name, type, isPk.equals("true"));
             }
             NamedNodeMap attrs = item.getAttributes();
-            result.addLast(new SqlTable(attrs.getNamedItem("name").getNodeValue(), Arrays.asList(columns)));
+            Node nameAttr = attrs.getNamedItem("name");
+            if (nameAttr == null) {
+                return null;
+            }
+            String name = nameAttr.getNodeValue();
+            if (!CHECK_NAME.matcher(name).matches()) {
+                return null;
+            }
+            Node meanAttr = attrs.getNamedItem("mean");
+            int mean = meanAttr == null ? DEFAULT_MEAN : Integer.valueOf(meanAttr.getNodeValue());
+            if (mean < 1) {
+                return null;
+            }
+            Node dispAttr = attrs.getNamedItem("dispersion");
+            double dispersion = dispAttr == null ? DEFAULT_DISPERSION_PERCENTAGE : Double.valueOf(dispAttr.getNodeValue());
+            if (dispersion < 0 || dispersion > 100.0) {
+                return null;
+            }
+            result.addLast(new SqlTable(name, Arrays.asList(columns), mean, dispersion));
         }
         return result;
     }
