@@ -7,10 +7,11 @@ public class SqlColumn {
 
     private boolean isPk;
 
-    public SqlColumn(String columnName, String columnType)
+    public SqlColumn(String columnName, String columnType, boolean isPrimaryKey)
     {
         name = columnName;
         type = columnType;
+        isPk = isPrimaryKey;
     }
 
     public String getColumnName()
