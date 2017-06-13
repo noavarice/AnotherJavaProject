@@ -40,6 +40,7 @@ public class XmlParser {
                 return null;
             }
             SqlColumn[] columns = new SqlColumn[columnCount];
+            TreeSet<String> uniqueColumnNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (int j = 0; j < columnCount; ++j) {
                 if (columnNodes.item(j).getNodeType() != Node.ELEMENT_NODE) {
                     continue;
@@ -50,6 +51,11 @@ public class XmlParser {
                     name = attrs.getNamedItem("name").getNodeValue().trim();
                     if (!CHECK_NAME.matcher(name).matches()) {
                         return null;
+                    }
+                    if (uniqueColumnNames.contains(name)) {
+                        return null;
+                    } else {
+                        uniqueColumnNames.add(name);
                     }
                     type = attrs.getNamedItem("type").getNodeValue().trim().toLowerCase();
                     if (!ALLOWED_TYPES.contains(type)) {
