@@ -33,10 +33,15 @@ public class XmlParser {
                     continue;
                 }
                 NamedNodeMap attrs = columnNodes.item(j).getAttributes();
-                String name = attrs.getNamedItem("name").getNodeValue();
-                String type = attrs.getNamedItem("type").getNodeValue();
-                String isPk = attrs.getNamedItem("isPrimaryKey").getNodeValue();
-                columns[j] = new SqlColumn(name, type, (isPk == null || isPk == "false") ? false : true);
+                String name, type;
+                try {
+                    name = attrs.getNamedItem("name").getNodeValue();
+                    type = attrs.getNamedItem("type").getNodeValue();
+                } catch (NullPointerException e) {
+                    return null;
+                }
+                Node isPk = attrs.getNamedItem("isPrimaryKey");
+                columns[j] = new SqlColumn(name, type, (isPk == null || isPk.getNodeValue().equals("false")) ? false : true);
             }
             NamedNodeMap attrs = item.getAttributes();
             result.addLast(new SqlTable(attrs.getNamedItem("name").getNodeValue(), Arrays.asList(columns)));
