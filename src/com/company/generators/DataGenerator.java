@@ -15,11 +15,18 @@ public class DataGenerator {
 
     private static final int MAX_STRING_LENGTH = 98;
 
+    private static final byte ASCII_MIN_BOUND = 32;
+
+    private static final byte ASCII_CHARACTERS_COUNT = 90;
+
     private static Hashtable<String, Supplier<Object>> TYPE_TO_VALUE = new Hashtable<String, Supplier<Object>>() {
         {
             put("string", () -> {
                 byte[] str = new byte[MAX_STRING_LENGTH];
                 RANDOM.nextBytes(str);
+                for (int i = 0; i < str.length; ++i) {
+                    str[i] = (byte)(str[i] % ASCII_MIN_BOUND + ASCII_CHARACTERS_COUNT);
+                }
                 return "\"" + new String(str) + "\"";
             });
             put("int", () -> RANDOM.nextInt());
