@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 public class DataGenerator {
     private static final Random RANDOM = new Random(System.currentTimeMillis() % 1000);
 
-    private static final int MAX_STRING_LENGTH = 98;
+    private static final int MAX_STRING_LENGTH = 20;
 
     private static final byte ASCII_MIN_BOUND = 32;
 
@@ -29,8 +29,8 @@ public class DataGenerator {
                 }
                 return "\"" + new String(str) + "\"";
             });
-            put("int", () -> RANDOM.nextInt());
-            put("double", () -> RANDOM.nextDouble());
+            put("integer", () -> RANDOM.nextInt());
+            put("double", () -> RANDOM.nextGaussian() * 1000000);
             put("boolean", () -> RANDOM.nextBoolean());
         }
     };
