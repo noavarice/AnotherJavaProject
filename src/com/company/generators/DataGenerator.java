@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 public class DataGenerator {
     private static final Random RANDOM = new Random(System.currentTimeMillis() % 1000);
 
-    private static final int MAX_STRING_LENGTH = 100;
+    private static final int MAX_STRING_LENGTH = 98;
 
     private static Hashtable<String, Supplier<Object>> TYPE_TO_VALUE = new Hashtable<String, Supplier<Object>>() {
         {
@@ -43,13 +43,13 @@ public class DataGenerator {
         PreparedStatement s = connection.prepareStatement(query);
         int mean = table.getMean();
         double dispersion = table.getDispersionPercentage();
-        int recordsCount = mean + RANDOM.nextInt() % (int)(mean * dispersion);
+        int recordsCount = mean + RANDOM.nextInt() % (int)(mean * dispersion / 100.0);
         boolean autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
         boolean result = true;
         for (int i = 0; i < recordsCount && result; ++i) {
-            for (int j = 1; j <= columns.length; ++j) {
-                s.setObject(j, TYPE_TO_VALUE.get(columns[j].getColumnType()).get());
+            for (int j = 0; j < columns.length; ++j) {
+                s.setObject(j + 1, TYPE_TO_VALUE.get(columns[j].getColumnType()).get());
             }
             if (s.executeUpdate() == 0) {
                 result = false;
