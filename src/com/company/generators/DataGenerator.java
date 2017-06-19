@@ -35,6 +35,43 @@ public class DataGenerator {
         }
     };
 
+    private static byte[][] makeMatrixClone(byte[][] matrix)
+    {
+        int length = matrix.length;
+        byte[][] result = new byte[length][];
+        for (int i = 0; i < length; ++i) {
+            result[i] = matrix[i].clone();
+        }
+        return result;
+    }
+
+    static private boolean isCycledGraph(byte[][] adjacencyMatrix)
+    {
+        byte[][] multipliedMatrix = makeMatrixClone(adjacencyMatrix);
+        byte[][] multiplier = makeMatrixClone(adjacencyMatrix);
+        int length = adjacencyMatrix.length;
+        for (int pathLength = 2; pathLength <= length; ++pathLength) {
+            byte[][] temp = makeMatrixClone(multipliedMatrix);
+            for (int i = 0; i < length; ++i) {
+                for (int j = 0; j < length; ++j) {
+                    temp[i][j] = 0;
+                    for (int k = 0; k < length; ++k) {
+                        temp[i][j] += multipliedMatrix[i][k] * multiplier[k][j];
+                    }
+                }
+            }
+            int sumDiag = 0;
+            for (int i = 0; i < length; ++i) {
+                sumDiag += temp[i][i];
+            }
+            if (sumDiag / pathLength != 0) {
+                return true;
+            }
+            multipliedMatrix = temp;
+        }
+        return false;
+    }
+
     public static boolean fillTable(Connection connection, SqlTable table) throws
             SQLException
     {
