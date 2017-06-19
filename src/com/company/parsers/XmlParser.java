@@ -26,6 +26,48 @@ public class XmlParser {
         }
     };
 
+    private static SqlColumn[] getColumns(Element columnRootNode)
+    {
+        NodeList columnNodes = columnRootNode.getElementsByTagName("column");
+        int columnCount = columnNodes.getLength();
+        if (columnCount == 0) {
+            return null;
+        }
+        SqlColumn[] result = new SqlColumn[columnCount];
+        TreeSet<String> uniqueColumnNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (int j = 0; j < columnCount; ++j) {
+            if (columnNodes.item(j).getNodeType() != Node.ELEMENT_NODE) {
+                continue;
+            }
+            NamedNodeMap attrs = columnNodes.item(j).getAttributes();
+            String name, type;
+            try {
+                name = attrs.getNamedItem("name").getNodeValue().trim();
+                if (!CHECK_NAME.matcher(name).matches()) {
+                    return null;
+                }
+                if (uniqueColumnNames.contains(name)) {
+                    return null;
+                } else {
+                    uniqueColumnNames.add(name);
+                }
+                type = attrs.getNamedItem("type").getNodeValue().trim().toLowerCase();
+                if (!ALLOWED_TYPES.contains(type)) {
+                    return null;
+                }
+            } catch (NullPointerException e) {
+                return null;
+            }
+            Node isPkNode = attrs.getNamedItem("isPrimaryKey");
+            String isPk = isPkNode == null ? "false" : isPkNode.getNodeValue().toLowerCase();
+            if (!isPk.equals("false") && !isPk.equals("true")) {
+                return null;
+            }
+            result[j] = new SqlColumn(name, type, isPk.equals("true"));
+        }
+        return result;
+    }
+
     public static Collection<SqlTable> fromFile(String filePath) throws
             IOException,
             SAXException
@@ -38,43 +80,6 @@ public class XmlParser {
         LinkedList<SqlTable> result = new LinkedList<>();
         for (int i = 0; i < childNodes.getLength(); ++i) {
             Element item = (Element)(childNodes.item(i));
-            NodeList columnNodes = item.getElementsByTagName("column");
-            int columnCount = columnNodes.getLength();
-            if (columnCount == 0) {
-                return null;
-            }
-            SqlColumn[] columns = new SqlColumn[columnCount];
-            TreeSet<String> uniqueColumnNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (int j = 0; j < columnCount; ++j) {
-                if (columnNodes.item(j).getNodeType() != Node.ELEMENT_NODE) {
-                    continue;
-                }
-                NamedNodeMap attrs = columnNodes.item(j).getAttributes();
-                String name, type;
-                try {
-                    name = attrs.getNamedItem("name").getNodeValue().trim();
-                    if (!CHECK_NAME.matcher(name).matches()) {
-                        return null;
-                    }
-                    if (uniqueColumnNames.contains(name)) {
-                        return null;
-                    } else {
-                        uniqueColumnNames.add(name);
-                    }
-                    type = attrs.getNamedItem("type").getNodeValue().trim().toLowerCase();
-                    if (!ALLOWED_TYPES.contains(type)) {
-                        return null;
-                    }
-                } catch (NullPointerException e) {
-                    return null;
-                }
-                Node isPkNode = attrs.getNamedItem("isPrimaryKey");
-                String isPk = isPkNode == null ? "false" : isPkNode.getNodeValue().toLowerCase();
-                if (!isPk.equals("false") && !isPk.equals("true")) {
-                    return null;
-                }
-                columns[j] = new SqlColumn(name, type, isPk.equals("true"));
-            }
             NamedNodeMap attrs = item.getAttributes();
             Node nameAttr = attrs.getNamedItem("name");
             if (nameAttr == null) {
@@ -92,6 +97,10 @@ public class XmlParser {
             Node dispAttr = attrs.getNamedItem("dispersion");
             double dispersion = dispAttr == null ? DEFAULT_DISPERSION_PERCENTAGE : Double.valueOf(dispAttr.getNodeValue());
             if (dispersion < 0 || dispersion > 100.0) {
+                return null;
+            }
+            SqlColumn[] columns = getColumns(item);
+            if (columns == null) {
                 return null;
             }
             result.addLast(new SqlTable(name, Arrays.asList(columns), mean, dispersion));
