@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Hashtable;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class DataGenerator {
@@ -70,6 +71,19 @@ public class DataGenerator {
             multipliedMatrix = temp;
         }
         return false;
+    }
+
+    private static boolean isCycledTableDeclaration(SqlTable[] tables)
+    {
+        int tablesCount = tables.length;
+        byte[][] adjacencyMatrix = new byte[tablesCount][tablesCount];
+        for (int i = 0; i < tablesCount; ++i) {
+            Set<String> refs = tables[i].getForeignKeys();
+            for (int j = 0; j < tablesCount; ++j) {
+                adjacencyMatrix[i][j] = (byte)(refs.contains(tables[j].getTableName()) ? 1 : 0);
+            }
+        }
+        return isCycledGraph(adjacencyMatrix);
     }
 
     public static boolean fillTable(Connection connection, SqlTable table) throws
