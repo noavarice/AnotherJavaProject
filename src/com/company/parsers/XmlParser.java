@@ -86,7 +86,7 @@ public class XmlParser {
         return result;
     }
 
-    public static Collection<SqlTable> fromFile(String filePath) throws
+    public static SqlTable[] fromFile(String filePath) throws
             IOException,
             SAXException
     {
@@ -96,8 +96,9 @@ public class XmlParser {
         Element root = doc.getDocumentElement();
         NodeList childNodes = root.getElementsByTagName("table");
         TreeSet<String> tableNames = new TreeSet<>();
-        LinkedList<SqlTable> result = new LinkedList<>();
-        for (int i = 0; i < childNodes.getLength(); ++i) {
+        int tablesCount = childNodes.getLength();
+        SqlTable[] result = new SqlTable[tablesCount];
+        for (int i = 0; i < tablesCount; ++i) {
             Element item = (Element)(childNodes.item(i));
             NamedNodeMap attrs = item.getAttributes();
             Node nameAttr = attrs.getNamedItem("name");
@@ -123,7 +124,7 @@ public class XmlParser {
             if (columns == null) {
                 return null;
             }
-            result.addLast(new SqlTable(name, Arrays.asList(columns), getTableReferences(item), mean, dispersion));
+            result[i] = new SqlTable(name, Arrays.asList(columns), getTableReferences(item), mean, dispersion);
         }
         for (SqlTable t : result) {
             for (String ref : t.getForeignKeys()) {
