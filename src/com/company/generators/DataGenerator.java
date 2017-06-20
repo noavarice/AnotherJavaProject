@@ -50,7 +50,7 @@ public class DataGenerator {
         byte[][] multipliedMatrix = makeMatrixClone(adjacencyMatrix);
         byte[][] multiplier = makeMatrixClone(adjacencyMatrix);
         int length = adjacencyMatrix.length;
-        for (int pathLength = 2; pathLength <= length; ++pathLength) {
+        for (int pathLength = 1; pathLength <= length; ++pathLength) {
             byte[][] temp = makeMatrixClone(multipliedMatrix);
             for (int i = 0; i < length; ++i) {
                 for (int j = 0; j < length; ++j) {
