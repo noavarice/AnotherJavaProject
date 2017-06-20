@@ -26,9 +26,11 @@ public class XmlParser {
         }
     };
 
-    private static SqlColumn[] getColumns(Element columnRootNode)
+    private static final String RESERVED_ID_NAME = "id";
+
+    private static SqlColumn[] getColumns(Element rootItem)
     {
-        NodeList columnNodes = columnRootNode.getElementsByTagName("column");
+        NodeList columnNodes = rootItem.getElementsByTagName("column");
         int columnCount = columnNodes.getLength();
         if (columnCount == 0) {
             return null;
@@ -46,6 +48,9 @@ public class XmlParser {
                 if (!CHECK_NAME.matcher(name).matches()) {
                     return null;
                 }
+                if (name.equalsIgnoreCase(RESERVED_ID_NAME)) {
+                    return null;
+                }
                 if (uniqueColumnNames.contains(name)) {
                     return null;
                 } else {
@@ -58,12 +63,25 @@ public class XmlParser {
             } catch (NullPointerException e) {
                 return null;
             }
-            Node isPkNode = attrs.getNamedItem("isPrimaryKey");
-            String isPk = isPkNode == null ? "false" : isPkNode.getNodeValue().toLowerCase();
-            if (!isPk.equals("false") && !isPk.equals("true")) {
-                return null;
+            result[j] = new SqlColumn(name, type);
+        }
+        return result;
+    }
+
+    private static Set<String> getTableReferences(Element rootItem)
+    {
+        NodeList l = rootItem.getElementsByTagName("reference");
+        if (l == null) {
+            return null;
+        }
+        int length = l.getLength();
+        Set<String> result = new HashSet<>();
+        for (int i = 0; i < length; i++) {
+            Node n = l.item(i);
+            if (n.getNodeType() != Node.ELEMENT_NODE) {
+                continue;
             }
-            result[j] = new SqlColumn(name, type, isPk.equals("true"));
+            result.add(n.getAttributes().getNamedItem("table").getNodeValue());
         }
         return result;
     }
@@ -77,6 +95,7 @@ public class XmlParser {
         Document doc = parser.getDocument();
         Element root = doc.getDocumentElement();
         NodeList childNodes = root.getElementsByTagName("table");
+        TreeSet<String> tableNames = new TreeSet<>();
         LinkedList<SqlTable> result = new LinkedList<>();
         for (int i = 0; i < childNodes.getLength(); ++i) {
             Element item = (Element)(childNodes.item(i));
@@ -89,6 +108,7 @@ public class XmlParser {
             if (!CHECK_NAME.matcher(name).matches()) {
                 return null;
             }
+            tableNames.add(name);
             Node meanAttr = attrs.getNamedItem("mean");
             int mean = meanAttr == null ? DEFAULT_MEAN : Integer.valueOf(meanAttr.getNodeValue());
             if (mean < 1) {
@@ -103,7 +123,14 @@ public class XmlParser {
             if (columns == null) {
                 return null;
             }
-            result.addLast(new SqlTable(name, Arrays.asList(columns), mean, dispersion));
+            result.addLast(new SqlTable(name, Arrays.asList(columns), getTableReferences(item), mean, dispersion));
+        }
+        for (SqlTable t : result) {
+            for (String ref : t.getForeignKeys()) {
+                if (!tableNames.contains(ref)) {
+                    return null;
+                }
+            }
         }
         return result;
     }

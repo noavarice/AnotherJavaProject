@@ -5,13 +5,10 @@ public class SqlColumn {
 
     private String type;
 
-    private boolean isPk;
-
-    public SqlColumn(String columnName, String columnType, boolean isPrimaryKey)
+    public SqlColumn(String columnName, String columnType)
     {
         name = columnName;
         type = columnType;
-        isPk = isPrimaryKey;
     }
 
     public String getColumnName()
@@ -22,10 +19,5 @@ public class SqlColumn {
     public String getColumnType()
     {
         return type;
-    }
-
-    public boolean isPrimaryKey()
-    {
-        return isPk;
     }
 }

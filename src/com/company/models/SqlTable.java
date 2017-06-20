@@ -1,22 +1,26 @@
 package com.company.models;
 
 import java.util.Collection;
+import java.util.Set;
 
 public class SqlTable {
     private String name;
 
-    private SqlColumn columns[] = null;
+    private final SqlColumn[] columns;
+
+    private final Set<String> refs;
 
     private int mean;
 
     private double dispersion;
 
-    public SqlTable(String tableName, Collection<SqlColumn> tableColumns, int mean, double dispersionPercentage)
+    public SqlTable(String tableName, Collection<SqlColumn> tableColumns, Set<String> foreignKeys, int mean, double dispersionPercentage)
     {
         name = tableName;
         columns = (SqlColumn[])(tableColumns.toArray());
         this.mean = mean;
         dispersion = dispersionPercentage;
+        refs = foreignKeys;
     }
 
     public String getTableName()
@@ -37,5 +41,10 @@ public class SqlTable {
     public double getDispersionPercentage()
     {
         return dispersion;
+    }
+
+    public Set<String> getForeignKeys()
+    {
+        return refs;
     }
 }
