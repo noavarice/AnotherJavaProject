@@ -109,7 +109,11 @@ public class XmlParser {
             if (!CHECK_NAME.matcher(name).matches()) {
                 return null;
             }
-            tableNames.add(name);
+            if (tableNames.contains(name)) {
+                return null;
+            } else {
+                tableNames.add(name);
+            }
             Node meanAttr = attrs.getNamedItem("mean");
             int mean = meanAttr == null ? DEFAULT_MEAN : Integer.valueOf(meanAttr.getNodeValue());
             if (mean < 1) {
