@@ -178,7 +178,7 @@ public class DataGenerator {
         }
         SqlTable[] orderedTables = getTablesInOrderOfCreation(tables);
         Properties props = new Properties();
-        props.load(new FileInputStream(new File("/home/alexrazinkov/Projects/Java/conn")));
+        props.load(new FileInputStream(new File(connectionPropertiesFilePath)));
         MysqlDataSource ds = new MysqlDataSource();
         ds.setServerName(props.getProperty("server"));
         ds.setDatabaseName(props.getProperty("database"));
