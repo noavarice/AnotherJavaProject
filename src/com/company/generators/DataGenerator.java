@@ -6,9 +6,7 @@ import com.company.models.SqlTable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Hashtable;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 public class DataGenerator {
@@ -84,6 +82,28 @@ public class DataGenerator {
             }
         }
         return isCycledGraph(adjacencyMatrix);
+    }
+
+    public static LinkedList<SqlTable> getTablesInOrderOfCreation(SqlTable[] tables)
+    {
+        LinkedList<SqlTable> result = new LinkedList<>(Arrays.asList(tables));
+        int currentItemIndex = 0;
+        int itemsCount = result.size();
+        int lastItemIndex = itemsCount - 1;
+        while (currentItemIndex < lastItemIndex) {
+            int i = lastItemIndex;
+            Set<String> refs = result.get(currentItemIndex).getForeignKeys();
+            while (i > currentItemIndex && !refs.contains(result.get(i).getTableName())) {
+                --i;
+            }
+            if (i == currentItemIndex) {
+                ++currentItemIndex;
+            } else {
+                result.add(i + 1, result.get(currentItemIndex));
+                result.remove(currentItemIndex);
+            }
+        }
+        return result;
     }
 
     public static boolean fillTable(Connection connection, SqlTable table) throws
