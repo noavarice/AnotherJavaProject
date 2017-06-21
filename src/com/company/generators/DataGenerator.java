@@ -166,15 +166,16 @@ public class DataGenerator {
     }
 
     public static void generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
+            DatabaseGenerationException,
             IOException,
             SAXException,
-            XMLSignatureException,
+            SQLException,
             XMLParseException,
-            SQLException
+            XMLSignatureException
     {
         SqlTable[] tables = XmlParser.fromFile(tableDeclarationFilePath);
         if (isCycledTableDeclaration(tables)) {
-            return;
+            throw new DatabaseGenerationException("Tables are declared cyclically");
         }
         SqlTable[] orderedTables = getTablesInOrderOfCreation(tables);
         Properties props = new Properties();

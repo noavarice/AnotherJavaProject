@@ -1,6 +1,7 @@
 package com.company;
 
 import com.company.generators.DataGenerator;
+import com.company.generators.DatabaseGenerationException;
 import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
@@ -15,7 +16,8 @@ public class Main {
             SAXException,
             SQLException,
             XMLSignatureException,
-            XMLParseException
+            XMLParseException,
+            DatabaseGenerationException
     {
         String connectionPropertiesFilePath = "/home/alexrazinkov/Projects/Java/conn";
         String tableDeclarationsFilePath = "/home/alexrazinkov/Projects/Java/xml_test";
