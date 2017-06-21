@@ -6,6 +6,8 @@ import com.sun.org.apache.xerces.internal.parsers.DOMParser;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
+import javax.management.modelmbean.XMLParseException;
+import javax.xml.crypto.dsig.XMLSignatureException;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -72,7 +74,7 @@ public class XmlParser {
     {
         NodeList l = rootItem.getElementsByTagName("reference");
         if (l == null) {
-            return null;
+            return new HashSet<>();
         }
         int length = l.getLength();
         Set<String> result = new HashSet<>();
@@ -88,7 +90,9 @@ public class XmlParser {
 
     public static SqlTable[] fromFile(String filePath) throws
             IOException,
-            SAXException
+            SAXException,
+            XMLSignatureException,
+            XMLParseException
     {
         DOMParser parser = new DOMParser();
         parser.parse(filePath);
@@ -103,37 +107,37 @@ public class XmlParser {
             NamedNodeMap attrs = item.getAttributes();
             Node nameAttr = attrs.getNamedItem("name");
             if (nameAttr == null) {
-                return null;
+                throw new XMLParseException("Table must have a name");
             }
             String name = nameAttr.getNodeValue();
             if (!CHECK_NAME.matcher(name).matches()) {
-                return null;
+                throw new XMLParseException(name + ": invalid table name");
             }
             if (tableNames.contains(name)) {
-                return null;
+                throw new XMLParseException("Tables must have unique names");
             } else {
                 tableNames.add(name);
             }
             Node meanAttr = attrs.getNamedItem("mean");
             int mean = meanAttr == null ? DEFAULT_MEAN : Integer.valueOf(meanAttr.getNodeValue());
             if (mean < 1) {
-                return null;
+                throw new XMLParseException(name + ": mean cannot be lesser then 1");
             }
             Node dispAttr = attrs.getNamedItem("dispersion");
             double dispersion = dispAttr == null ? DEFAULT_DISPERSION_PERCENTAGE : Double.valueOf(dispAttr.getNodeValue());
             if (dispersion < 0 || dispersion > 100.0) {
-                return null;
+                throw new XMLParseException(name + ": dispersion value must belong to [0, 100] interval");
             }
             SqlColumn[] columns = getColumns(item);
             if (columns == null) {
-                return null;
+                throw new XMLSignatureException(new Throwable(name + ": cannot create table without user-defined columns"));
             }
             result[i] = new SqlTable(name, Arrays.asList(columns), getTableReferences(item), mean, dispersion);
         }
         for (SqlTable t : result) {
             for (String ref : t.getForeignKeys()) {
                 if (!tableNames.contains(ref)) {
-                    return null;
+                    throw new XMLParseException("Table \"" + t.getTableName() + "\" references to non-existing table \"" + ref + "\"");
                 }
             }
         }
