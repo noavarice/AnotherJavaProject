@@ -1,6 +1,7 @@
 package com.company.parsers;
 
 import com.company.models.SqlColumn;
+import com.company.models.SqlDatabase;
 import com.company.models.SqlTable;
 import com.sun.org.apache.xerces.internal.parsers.DOMParser;
 import org.w3c.dom.*;
@@ -92,7 +93,7 @@ public class XmlParser {
         return result;
     }
 
-    public static SqlTable[] fromFile(String filePath) throws
+    public static SqlDatabase fromFile(String filePath) throws
             IOException,
             SAXException,
             XMLSignatureException,
@@ -102,10 +103,15 @@ public class XmlParser {
         parser.parse(filePath);
         Document doc = parser.getDocument();
         Element root = doc.getDocumentElement();
+        NamedNodeMap databaseAttrs = root.getAttributes();
+        Node databaseName = databaseAttrs.getNamedItem("name");
+        if (databaseAttrs == null) {
+            throw new XMLParseException("Database must have name");
+        }
         NodeList childNodes = root.getElementsByTagName("table");
         TreeSet<String> tableNames = new TreeSet<>();
         int tablesCount = childNodes.getLength();
-        SqlTable[] result = new SqlTable[tablesCount];
+        SqlTable[] tables = new SqlTable[tablesCount];
         for (int i = 0; i < tablesCount; ++i) {
             Element item = (Element)(childNodes.item(i));
             NamedNodeMap attrs = item.getAttributes();
@@ -145,15 +151,15 @@ public class XmlParser {
             if (columns == null && refs.isEmpty()) {
                 throw new XMLParseException("Table \"" + name + "\" has no columns nor references to another tables");
             }
-            result[i] = new SqlTable(name, Arrays.asList(columns), refs, mean, dispersion);
+            tables[i] = new SqlTable(name, Arrays.asList(columns), refs, mean, dispersion);
         }
-        for (SqlTable t : result) {
+        for (SqlTable t : tables) {
             for (String ref : t.getForeignKeys()) {
                 if (!tableNames.contains(ref)) {
                     throw new XMLParseException("Table \"" + t.getTableName() + "\" references to non-existing table \"" + ref + "\"");
                 }
             }
         }
-        return result;
+        return new SqlDatabase(databaseName.getNodeValue(), tables);
     }
 }
