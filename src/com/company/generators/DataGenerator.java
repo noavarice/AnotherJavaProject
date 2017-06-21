@@ -13,8 +13,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 public class DataGenerator {
@@ -41,6 +43,8 @@ public class DataGenerator {
             put("boolean", () -> RANDOM.nextBoolean());
         }
     };
+
+    private static final IntFunction<Integer> GET_FOREIGN_KEY = (maxValue) -> (Math.abs(RANDOM.nextInt()) % maxValue) + 1;
 
     private static byte[][] makeMatrixClone(byte[][] matrix)
     {
@@ -126,29 +130,38 @@ public class DataGenerator {
             columnNames.append(",").append(columns[i].getColumnName());
             values.append(",?");
         }
-        String query = "INSERT INTO " + table.getTableName() + " (" + columnNames.toString() + ") VALUES ("
-                + values.toString() + ")";
-        PreparedStatement s = connection.prepareStatement(query);
+        Set<String> refSet = table.getForeignKeys();
+        int refsCount = refSet.size();
+        String[] refs = new String[refsCount];
+        refSet.toArray(refs);
+        int[] maxIdValues = new int[refsCount];
+        for (int i = 0; i < refsCount; ++i) {
+            columnNames.append(",").append(refs[i]).append("ID");
+            values.append(",?");
+            PreparedStatement s = connection.prepareStatement("SELECT MAX(id) FROM " + refs[i]);
+            ResultSet rs = s.executeQuery();
+            rs.next();
+            maxIdValues[i] = rs.getInt(1);
+        }
         int mean = table.getMean();
         double dispersion = table.getDispersionPercentage();
         int recordsCount = mean + RANDOM.nextInt() % (int)(mean * dispersion / 100.0);
-        boolean autoCommit = connection.getAutoCommit();
-        connection.setAutoCommit(false);
+        String insertQuery = "INSERT INTO " + table.getTableName() + " (" + columnNames.toString() + ") VALUES ("
+                + values.toString() + ")";
+        PreparedStatement s = connection.prepareStatement(insertQuery);
         boolean result = true;
         for (int i = 0; i < recordsCount && result; ++i) {
-            for (int j = 0; j < columns.length; ++j) {
+            int nonRefColumnsCount = columns.length;
+            for (int j = 0; j < nonRefColumnsCount; ++j) {
                 s.setObject(j + 1, TYPE_TO_VALUE.get(columns[j].getColumnType()).get());
+            }
+            for (int j = 0; j < refsCount; ++j) {
+                s.setObject(nonRefColumnsCount + j + 1, GET_FOREIGN_KEY.apply(maxIdValues[j]));
             }
             if (s.executeUpdate() == 0) {
                 result = false;
             }
         }
-        if (result) {
-            connection.commit();
-        } else {
-            connection.rollback();
-        }
-        connection.setAutoCommit(autoCommit);
         return result;
     }
 
@@ -172,8 +185,19 @@ public class DataGenerator {
         ds.setUser(props.getProperty("username"));
         ds.setPassword(props.getProperty("password"));
         Connection conn = ds.getConnection();
+        conn.setAutoCommit(false);
+        boolean result = true;
         for (SqlTable t : orderedTables) {
-            fillTable(conn, t);
+            result = fillTable(conn, t);
+            if (!result) {
+                break;
+            }
         }
+        if (result) {
+            conn.commit();
+        } else {
+            conn.rollback();
+        }
+        conn.close();
     }
 }
