@@ -2,7 +2,15 @@ package com.company.generators;
 
 import com.company.models.SqlColumn;
 import com.company.models.SqlTable;
+import com.company.parsers.XmlParser;
+import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
+import org.xml.sax.SAXException;
 
+import javax.management.modelmbean.XMLParseException;
+import javax.xml.crypto.dsig.XMLSignatureException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -84,29 +92,31 @@ public class DataGenerator {
         return isCycledGraph(adjacencyMatrix);
     }
 
-    public static LinkedList<SqlTable> getTablesInOrderOfCreation(SqlTable[] tables)
+    private static SqlTable[] getTablesInOrderOfCreation(SqlTable[] tables)
     {
-        LinkedList<SqlTable> result = new LinkedList<>(Arrays.asList(tables));
+        LinkedList<SqlTable> temp = new LinkedList<>(Arrays.asList(tables));
         int currentItemIndex = 0;
-        int itemsCount = result.size();
+        int itemsCount = temp.size();
         int lastItemIndex = itemsCount - 1;
         while (currentItemIndex < lastItemIndex) {
             int i = lastItemIndex;
-            Set<String> refs = result.get(currentItemIndex).getForeignKeys();
-            while (i > currentItemIndex && !refs.contains(result.get(i).getTableName())) {
+            Set<String> refs = temp.get(currentItemIndex).getForeignKeys();
+            while (i > currentItemIndex && !refs.contains(temp.get(i).getTableName())) {
                 --i;
             }
             if (i == currentItemIndex) {
                 ++currentItemIndex;
             } else {
-                result.add(i + 1, result.get(currentItemIndex));
-                result.remove(currentItemIndex);
+                temp.add(i + 1, temp.get(currentItemIndex));
+                temp.remove(currentItemIndex);
             }
         }
+        SqlTable[] result = new SqlTable[itemsCount];
+        temp.toArray(result);
         return result;
     }
 
-    public static boolean fillTable(Connection connection, SqlTable table) throws
+    private static boolean fillTable(Connection connection, SqlTable table) throws
             SQLException
     {
         SqlColumn[] columns = table.getTableColumns();
@@ -140,5 +150,30 @@ public class DataGenerator {
         }
         connection.setAutoCommit(autoCommit);
         return result;
+    }
+
+    public static void generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
+            IOException,
+            SAXException,
+            XMLSignatureException,
+            XMLParseException,
+            SQLException
+    {
+        SqlTable[] tables = XmlParser.fromFile(tableDeclarationFilePath);
+        if (isCycledTableDeclaration(tables)) {
+            return;
+        }
+        SqlTable[] orderedTables = getTablesInOrderOfCreation(tables);
+        Properties props = new Properties();
+        props.load(new FileInputStream(new File("/home/alexrazinkov/Projects/Java/conn")));
+        MysqlDataSource ds = new MysqlDataSource();
+        ds.setServerName(props.getProperty("server"));
+        ds.setDatabaseName(props.getProperty("database"));
+        ds.setUser(props.getProperty("username"));
+        ds.setPassword(props.getProperty("password"));
+        Connection conn = ds.getConnection();
+        for (SqlTable t : orderedTables) {
+            fillTable(conn, t);
+        }
     }
 }
