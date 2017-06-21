@@ -30,7 +30,10 @@ public class XmlParser {
 
     private static final String RESERVED_ID_NAME = "id";
 
-    private static SqlColumn[] getColumns(Element rootItem)
+    private static final String FOREIGN_KEY_COLUMN_SUFFIX = "ID";
+
+    private static SqlColumn[] getColumns(Element rootItem, TreeSet<String> reservedNames) throws
+            XMLParseException
     {
         NodeList columnNodes = rootItem.getElementsByTagName("column");
         int columnCount = columnNodes.getLength();
@@ -44,26 +47,27 @@ public class XmlParser {
                 continue;
             }
             NamedNodeMap attrs = columnNodes.item(j).getAttributes();
-            String name, type;
-            try {
-                name = attrs.getNamedItem("name").getNodeValue().trim();
-                if (!CHECK_NAME.matcher(name).matches()) {
-                    return null;
-                }
-                if (name.equalsIgnoreCase(RESERVED_ID_NAME)) {
-                    return null;
-                }
-                if (uniqueColumnNames.contains(name)) {
-                    return null;
-                } else {
-                    uniqueColumnNames.add(name);
-                }
-                type = attrs.getNamedItem("type").getNodeValue().trim().toLowerCase();
-                if (!ALLOWED_TYPES.contains(type)) {
-                    return null;
-                }
-            } catch (NullPointerException e) {
-                return null;
+            String name = attrs.getNamedItem("name").getNodeValue().trim();
+            if (name == null) {
+                throw new XMLParseException("Column must have a name");
+            }
+            if (!CHECK_NAME.matcher(name).matches()) {
+                throw new XMLParseException("Column name \"" + name + "\" is invalid");
+            }
+            if (reservedNames.contains(name)) {
+                throw new XMLParseException("Column name \"" + name + "\" is reserved for PK or column referenced in FK");
+            }
+            if (uniqueColumnNames.contains(name)) {
+                throw new XMLParseException("Column with name \"" + name + "\" has been defined multiple times");
+            } else {
+                uniqueColumnNames.add(name);
+            }
+            String type = attrs.getNamedItem("type").getNodeValue().trim().toLowerCase();
+            if (type == null) {
+                throw new XMLParseException("Column \"" + name + "\" must have a type");
+            }
+            if (!ALLOWED_TYPES.contains(type)) {
+                throw new XMLParseException("Type of column \"" + name + "\" is not recognized");
             }
             result[j] = new SqlColumn(name, type);
         }
@@ -128,11 +132,20 @@ public class XmlParser {
             if (dispersion < 0 || dispersion > 100.0) {
                 throw new XMLParseException(name + ": dispersion value must belong to [0, 100] interval");
             }
-            SqlColumn[] columns = getColumns(item);
-            if (columns == null) {
-                throw new XMLSignatureException(new Throwable(name + ": cannot create table without user-defined columns"));
+            Set<String> refs = getTableReferences(item);
+            TreeSet<String> reservedColumnNames = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER) {
+                {
+                    add(RESERVED_ID_NAME);
+                    for (String s : refs) {
+                        add(s + FOREIGN_KEY_COLUMN_SUFFIX);
+                    }
+                }
+            };
+            SqlColumn[] columns = getColumns(item, reservedColumnNames);
+            if (columns == null && refs.isEmpty()) {
+                throw new XMLParseException("Table \"" + name + "\" has no columns nor references to another tables");
             }
-            result[i] = new SqlTable(name, Arrays.asList(columns), getTableReferences(item), mean, dispersion);
+            result[i] = new SqlTable(name, Arrays.asList(columns), refs, mean, dispersion);
         }
         for (SqlTable t : result) {
             for (String ref : t.getForeignKeys()) {
