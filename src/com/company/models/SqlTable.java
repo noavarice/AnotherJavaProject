@@ -14,10 +14,10 @@ public class SqlTable {
 
     private double dispersion;
 
-    public SqlTable(String tableName, Collection<SqlColumn> tableColumns, Set<String> foreignKeys, int mean, double dispersionPercentage)
+    public SqlTable(String tableName, SqlColumn[] tableColumns, Set<String> foreignKeys, int mean, double dispersionPercentage)
     {
         name = tableName;
-        columns = (SqlColumn[])(tableColumns.toArray());
+        columns = tableColumns;
         this.mean = mean;
         dispersion = dispersionPercentage;
         refs = foreignKeys;

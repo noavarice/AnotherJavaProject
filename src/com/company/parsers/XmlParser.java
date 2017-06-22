@@ -151,7 +151,7 @@ public class XmlParser {
             if (columns == null && refs.isEmpty()) {
                 throw new XMLParseException("Table \"" + name + "\" has no columns nor references to another tables");
             }
-            tables[i] = new SqlTable(name, Arrays.asList(columns), refs, mean, dispersion);
+            tables[i] = new SqlTable(name, columns, refs, mean, dispersion);
         }
         for (SqlTable t : tables) {
             for (String ref : t.getForeignKeys()) {
