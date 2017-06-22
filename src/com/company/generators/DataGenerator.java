@@ -4,10 +4,11 @@ import com.company.models.SqlColumn;
 import com.company.models.SqlDatabase;
 import com.company.models.SqlTable;
 import com.company.parsers.XmlParser;
-import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
+import com.mysql.cj.jdbc.MysqlDataSource;
 import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
+import javax.sql.DataSource;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import java.io.File;
 import java.io.FileInputStream;
