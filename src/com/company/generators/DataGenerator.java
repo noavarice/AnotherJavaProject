@@ -1,6 +1,7 @@
 package com.company.generators;
 
 import com.company.models.SqlColumn;
+import com.company.models.SqlDatabase;
 import com.company.models.SqlTable;
 import com.company.parsers.XmlParser;
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
@@ -11,10 +12,7 @@ import javax.xml.crypto.dsig.XMLSignatureException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -41,6 +39,17 @@ public class DataGenerator {
             put("integer", () -> RANDOM.nextInt());
             put("double", () -> RANDOM.nextGaussian() * 1000000);
             put("boolean", () -> RANDOM.nextBoolean());
+        }
+    };
+
+    private static final String FOREIGN_KEY_COLUMN_TYPE = "INTEGER NOT NULL";
+
+    private static final Hashtable<String, String> ABSTRACT_TYPES_TO_DATABASE_TYPES = new Hashtable<String, String>() {
+        {
+            put("string", "VARCHAR(100) NOT NULL");
+            put("integer", "INTEGER NOT NULL");
+            put("double", "DOUBLE NOT NULL");
+            put("boolean", "BOOLEAN NOT NULL");
         }
     };
 
@@ -165,6 +174,45 @@ public class DataGenerator {
         return result;
     }
 
+    private static boolean databaseExists(Connection connection, String databaseName) throws
+            SQLException
+    {
+        Statement s = connection.createStatement();
+        return s.executeQuery("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" + databaseName + "'").next();
+    }
+
+    private static void createTableScheme(Connection connection, SqlTable table) throws
+            SQLException
+    {
+        StringBuilder createTableQuery = new StringBuilder("CREATE TABLE ");
+        String tableName = table.getTableName();
+        createTableQuery.append(tableName).append("(id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT");
+        for (SqlColumn column : table.getTableColumns()) {
+            createTableQuery
+                    .append(',')
+                    .append(column.getColumnName())
+                    .append(' ')
+                    .append(ABSTRACT_TYPES_TO_DATABASE_TYPES.get(column.getColumnType()));
+        }
+        int refsCount = table.getForeignKeys().size();
+        String[] refs = new String[refsCount];
+        table.getForeignKeys().toArray(refs);
+        String[] fkQueries = new String[refsCount];
+        for (int i = 0; i < refsCount; ++i) {
+            String refColumnName = refs[i] + "ID";
+            createTableQuery.append(',').append(refColumnName).append(' ').append(FOREIGN_KEY_COLUMN_TYPE);
+            fkQueries[i] = "ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + refColumnName +
+                    ") REFERENCES " + refs[i] + "(id)";
+        }
+        createTableQuery.append(')');
+        Statement s = connection.createStatement();
+        s.executeUpdate(createTableQuery.toString());
+        for (String query : fkQueries) {
+            s.executeUpdate(query);
+        }
+        s.close();
+    }
+
     public static void generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
             DatabaseGenerationException,
             IOException,
@@ -173,7 +221,8 @@ public class DataGenerator {
             XMLParseException,
             XMLSignatureException
     {
-        SqlTable[] tables = XmlParser.fromFile(tableDeclarationFilePath);
+        SqlDatabase database = XmlParser.fromFile(tableDeclarationFilePath);
+        SqlTable[] tables = database.getDatabaseTables();
         if (isCycledTableDeclaration(tables)) {
             throw new DatabaseGenerationException("Tables are declared cyclically");
         }
@@ -182,13 +231,21 @@ public class DataGenerator {
         props.load(new FileInputStream(new File(connectionPropertiesFilePath)));
         MysqlDataSource ds = new MysqlDataSource();
         ds.setServerName(props.getProperty("server"));
-        ds.setDatabaseName(props.getProperty("database"));
         ds.setUser(props.getProperty("username"));
         ds.setPassword(props.getProperty("password"));
         Connection conn = ds.getConnection();
+        String databaseName = database.getDatabaseName();
         conn.setAutoCommit(false);
+        if (databaseExists(conn, databaseName)) {
+            throw new DatabaseGenerationException("Database \"" + databaseName + "\" already exists");
+        }
+        Statement s = conn.createStatement();
+        s.executeUpdate("CREATE DATABASE " + databaseName);
+        s.executeUpdate("USE " + databaseName);
+        s.close();
         boolean result = true;
         for (SqlTable t : orderedTables) {
+            createTableScheme(conn, t);
             result = fillTable(conn, t);
             if (!result) {
                 break;
