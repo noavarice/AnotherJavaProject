@@ -2,6 +2,7 @@ package com.company.generators;
 
 import com.company.models.SqlColumn;
 import com.company.models.SqlDatabase;
+import com.company.models.SqlNumericColumn;
 import com.company.models.SqlTable;
 import com.company.parsers.XmlParser;
 import com.mysql.cj.jdbc.MysqlDataSource;
@@ -14,8 +15,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.*;
 import java.util.*;
+import java.util.function.DoubleSupplier;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.function.ToDoubleBiFunction;
 
 public class DataGenerator {
     private static final Random RANDOM = new Random(System.currentTimeMillis() % 1000);
@@ -26,7 +29,7 @@ public class DataGenerator {
 
     private static final byte ASCII_CHARACTERS_COUNT = 90;
 
-    private static Hashtable<String, Supplier<Object>> TYPE_TO_VALUE = new Hashtable<String, Supplier<Object>>() {
+    private static Hashtable<String, Supplier<Object>> NON_NUMERIC_TYPES = new Hashtable<String, Supplier<Object>>() {
         {
             put("string", () -> {
                 byte[] str = new byte[MAX_STRING_LENGTH];
@@ -36,9 +39,18 @@ public class DataGenerator {
                 }
                 return "\"" + new String(str) + "\"";
             });
-            put("integer", () -> RANDOM.nextInt());
-            put("double", () -> RANDOM.nextGaussian() * 1000000);
             put("boolean", () -> RANDOM.nextBoolean());
+        }
+    };
+
+    private static double getDistributedValue(double mean, double dispersion)
+    {
+        return RANDOM.nextGaussian() * mean * dispersion / 100.0 + mean;
+    }
+    private static Hashtable<String, ToDoubleBiFunction<Double, Double>> NUMERIC_TYPES = new Hashtable<String, ToDoubleBiFunction<Double, Double>>() {
+        {
+            put("integer", (mean, dispersion) -> (int)(getDistributedValue(mean, dispersion)));
+            put("double", (mean, dispersion) -> getDistributedValue(mean, dispersion));
         }
     };
 
@@ -162,7 +174,12 @@ public class DataGenerator {
         for (int i = 0; i < recordsCount && result; ++i) {
             int nonRefColumnsCount = columns.length;
             for (int j = 0; j < nonRefColumnsCount; ++j) {
-                s.setObject(j + 1, TYPE_TO_VALUE.get(columns[j].getColumnType()).get());
+                if (columns[j] instanceof SqlNumericColumn) {
+                    SqlNumericColumn c = (SqlNumericColumn)(columns[j]);
+                    s.setObject(j + 1, NUMERIC_TYPES.get(c.getColumnType()).applyAsDouble(c.getMean(), c.getDispersionPercentage()));
+                } else {
+                    s.setObject(j + 1, NON_NUMERIC_TYPES.get(columns[j].getColumnType()).get());
+                }
             }
             for (int j = 0; j < refsCount; ++j) {
                 s.setObject(nonRefColumnsCount + j + 1, GET_FOREIGN_KEY.apply(maxIdValues[j]));

@@ -1,6 +1,6 @@
 package com.company.models;
 
-public class SqlColumn {
+public abstract class SqlColumn {
     private String name;
 
     private String type;

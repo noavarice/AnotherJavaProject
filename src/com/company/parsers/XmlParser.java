@@ -1,8 +1,6 @@
 package com.company.parsers;
 
-import com.company.models.SqlColumn;
-import com.company.models.SqlDatabase;
-import com.company.models.SqlTable;
+import com.company.models.*;
 import com.sun.org.apache.xerces.internal.parsers.DOMParser;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
@@ -28,6 +26,17 @@ public class XmlParser {
             add("boolean");
         }
     };
+
+    private static final Set<String> NUMERIC_TYPES = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER) {
+        {
+            add("double");
+            add("integer");
+        }
+    };
+
+    private static final int DEFAULT_NUMERIC_COLUMN_MEAN_VALUE = 0;
+
+    private static final int DEFAULT_NUMERIC_COLUMN_DISPERSION_PERCENTAGE = 10;
 
     private static final String RESERVED_ID_NAME = "id";
 
@@ -70,7 +79,19 @@ public class XmlParser {
             if (!ALLOWED_TYPES.contains(type)) {
                 throw new XMLParseException("Type of column \"" + name + "\" is not recognized");
             }
-            result[j] = new SqlColumn(name, type);
+            if (NUMERIC_TYPES.contains(type)) {
+                try {
+                    Node node = attrs.getNamedItem("mean");
+                    double mean = node == null ? DEFAULT_NUMERIC_COLUMN_MEAN_VALUE : Double.valueOf(node.getNodeValue());
+                    node = attrs.getNamedItem("dispersion");
+                    double dispersion = node == null ? DEFAULT_NUMERIC_COLUMN_DISPERSION_PERCENTAGE : Double.valueOf(node.getNodeValue());
+                    result[j] = new SqlNumericColumn(name, type, mean, dispersion);
+                } catch (NumberFormatException e) {
+                    throw new XMLParseException("Cannot parse attributes of column \"" + name + "\"");
+                }
+            } else {
+                result[j] = new SqlNonNumericColumn(name, type);
+            }
         }
         return result;
     }
