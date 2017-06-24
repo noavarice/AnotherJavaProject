@@ -8,6 +8,7 @@ import org.xml.sax.SAXException;
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -42,7 +43,7 @@ public class XmlParser {
 
     private static final String FOREIGN_KEY_COLUMN_SUFFIX = "ID";
 
-    private static SqlColumn[] getColumns(Element rootItem, TreeSet<String> reservedNames) throws
+    private static SqlColumn[] getColumns(Element rootItem) throws
             XMLParseException
     {
         NodeList columnNodes = rootItem.getElementsByTagName("column");
@@ -63,9 +64,6 @@ public class XmlParser {
             }
             if (!CHECK_NAME.matcher(name).matches()) {
                 throw new XMLParseException("Column name \"" + name + "\" is invalid");
-            }
-            if (reservedNames.contains(name)) {
-                throw new XMLParseException("Column name \"" + name + "\" is reserved for PK or column referenced in FK");
             }
             if (uniqueColumnNames.contains(name)) {
                 throw new XMLParseException("Column with name \"" + name + "\" has been defined multiple times");
@@ -96,21 +94,40 @@ public class XmlParser {
         return result;
     }
 
-    private static Set<String> getTableReferences(Element rootItem)
+    private static Reference[] getTableReferences(Element rootItem, Set<String> columnNames) throws
+            XMLParseException
     {
         NodeList l = rootItem.getElementsByTagName("reference");
         if (l == null) {
-            return new HashSet<>();
+            return null;
         }
         int length = l.getLength();
-        Set<String> result = new HashSet<>();
+        LinkedList<Reference> refs = new LinkedList<>();
+        Set<String> refsNames = new HashSet<>();
         for (int i = 0; i < length; i++) {
             Node n = l.item(i);
             if (n.getNodeType() != Node.ELEMENT_NODE) {
                 continue;
             }
-            result.add(n.getAttributes().getNamedItem("table").getNodeValue());
+            NamedNodeMap attrs = n.getAttributes();
+            Node temp = attrs.getNamedItem("table");
+            if (temp == null) {
+                throw new XMLParseException("Reference to unnamed table");
+            }
+            String tableName = temp.getNodeValue();
+            temp = attrs.getNamedItem("columnName");
+            String columnName = temp.getNodeValue();
+            if (columnNames.contains(columnName) || refsNames.contains(columnName)) {
+                throw new XMLParseException("Referencing column with name \"" + columnName + "\" already uses by another column or reference");
+            }
+            refsNames.add(columnName);
+            if (temp == null) {
+                throw new XMLParseException("Referencing from unnamed column");
+            }
+            refs.add(new Reference(tableName, temp.getNodeValue()));
         }
+        Reference[] result = new Reference[refs.size()];
+        refs.toArray(result);
         return result;
     }
 
@@ -159,25 +176,30 @@ public class XmlParser {
             if (dispersion < 0 || dispersion > 100.0) {
                 throw new XMLParseException(name + ": dispersion value must belong to [0, 100] interval");
             }
-            Set<String> refs = getTableReferences(item);
-            TreeSet<String> reservedColumnNames = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER) {
+            SqlColumn[] columns = getColumns(item);
+            Set<String> columnNames = new HashSet<String>() {
                 {
-                    add(RESERVED_ID_NAME);
-                    for (String s : refs) {
-                        add(s + FOREIGN_KEY_COLUMN_SUFFIX);
+                    for (SqlColumn c : columns) {
+                        add(c.getColumnName());
                     }
                 }
             };
-            SqlColumn[] columns = getColumns(item, reservedColumnNames);
-            if (columns == null && refs.isEmpty()) {
+             Reference[] refs = getTableReferences(item, columnNames);
+            if (columns == null && refs == null) {
                 throw new XMLParseException("Table \"" + name + "\" has no columns nor references to another tables");
             }
             tables[i] = new SqlTable(name, columns, refs, mean, dispersion);
         }
         for (SqlTable t : tables) {
-            for (String ref : t.getForeignKeys()) {
-                if (!tableNames.contains(ref)) {
-                    throw new XMLParseException("Table \"" + t.getTableName() + "\" references to non-existing table \"" + ref + "\"");
+            Reference[] refs = t.getForeignKeys();
+            if (refs == null) {
+                continue;
+            }
+            String tableName = t.getTableName();
+            for (Reference ref : refs) {
+                String refTableName = ref.getTableName();
+                if (!tableNames.contains(refTableName)) {
+                    throw new XMLParseException("Table \"" + tableName + "\" references to non-existing table \"" + refTableName + "\"");
                 }
             }
         }

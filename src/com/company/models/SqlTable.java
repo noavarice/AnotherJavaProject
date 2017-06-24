@@ -8,13 +8,13 @@ public class SqlTable {
 
     private final SqlColumn[] columns;
 
-    private final Set<String> refs;
+    private final Reference[] refs;
 
     private int mean;
 
     private double dispersion;
 
-    public SqlTable(String tableName, SqlColumn[] tableColumns, Set<String> foreignKeys, int mean, double dispersionPercentage)
+    public SqlTable(String tableName, SqlColumn[] tableColumns, Reference[] foreignKeys, int mean, double dispersionPercentage)
     {
         name = tableName;
         columns = tableColumns;
@@ -43,7 +43,7 @@ public class SqlTable {
         return dispersion;
     }
 
-    public Set<String> getForeignKeys()
+    public Reference[] getForeignKeys()
     {
         return refs;
     }

@@ -1,9 +1,6 @@
 package com.company.generators;
 
-import com.company.models.SqlColumn;
-import com.company.models.SqlDatabase;
-import com.company.models.SqlNumericColumn;
-import com.company.models.SqlTable;
+import com.company.models.*;
 import com.company.parsers.XmlParser;
 import com.mysql.cj.jdbc.MysqlDataSource;
 import org.xml.sax.SAXException;
@@ -108,9 +105,16 @@ public class DataGenerator {
         int tablesCount = tables.length;
         byte[][] adjacencyMatrix = new byte[tablesCount][tablesCount];
         for (int i = 0; i < tablesCount; ++i) {
-            Set<String> refs = tables[i].getForeignKeys();
+            Reference[] refs = tables[i].getForeignKeys();
+            Set<String> refNames = new HashSet<String>() {
+                {
+                    for (Reference ref : refs) {
+                        add(ref.getTableName());
+                    }
+                }
+            };
             for (int j = 0; j < tablesCount; ++j) {
-                adjacencyMatrix[i][j] = (byte)(refs.contains(tables[j].getTableName()) ? 1 : 0);
+                adjacencyMatrix[i][j] = (byte)(refNames.contains(tables[j].getTableName()) ? 1 : 0);
             }
         }
         return isCycledGraph(adjacencyMatrix);
@@ -124,8 +128,15 @@ public class DataGenerator {
         int lastItemIndex = itemsCount - 1;
         while (currentItemIndex < lastItemIndex) {
             int i = lastItemIndex;
-            Set<String> refs = temp.get(currentItemIndex).getForeignKeys();
-            while (i > currentItemIndex && !refs.contains(temp.get(i).getTableName())) {
+            final int index = currentItemIndex;
+            Set<String> refNames = new HashSet<String>() {
+                {
+                    for (Reference ref : temp.get(index).getForeignKeys()) {
+                        add(ref.getTableName());
+                    }
+                }
+            };
+            while (i > currentItemIndex && !refNames.contains(temp.get(i).getTableName())) {
                 --i;
             }
             if (i == currentItemIndex) {
@@ -150,15 +161,13 @@ public class DataGenerator {
             columnNames.append(",").append(columns[i].getColumnName());
             values.append(",?");
         }
-        Set<String> refSet = table.getForeignKeys();
-        int refsCount = refSet.size();
-        String[] refs = new String[refsCount];
-        refSet.toArray(refs);
-        int[] maxIdValues = new int[refsCount];
+        Reference[] refs = table.getForeignKeys();
+        int refsCount = refs.length;
+        int[] maxIdValues = new int[refs.length];
         for (int i = 0; i < refsCount; ++i) {
-            columnNames.append(",").append(refs[i]).append("ID");
+            columnNames.append(",").append(refs[i].getColumnName());
             values.append(",?");
-            PreparedStatement s = connection.prepareStatement("SELECT MAX(id) FROM " + refs[i]);
+            PreparedStatement s = connection.prepareStatement("SELECT MAX(id) FROM " + refs[i].getTableName());
             ResultSet rs = s.executeQuery();
             rs.next();
             maxIdValues[i] = rs.getInt(1);
@@ -210,15 +219,14 @@ public class DataGenerator {
                     .append(' ')
                     .append(ABSTRACT_TYPES_TO_DATABASE_TYPES.get(column.getColumnType()));
         }
-        int refsCount = table.getForeignKeys().size();
-        String[] refs = new String[refsCount];
-        table.getForeignKeys().toArray(refs);
+        Reference[] refs = table.getForeignKeys();
+        int refsCount = refs.length;
         String[] fkQueries = new String[refsCount];
         for (int i = 0; i < refsCount; ++i) {
-            String refColumnName = refs[i] + "ID";
+            String refColumnName = refs[i].getColumnName();
             createTableQuery.append(',').append(refColumnName).append(' ').append(FOREIGN_KEY_COLUMN_TYPE);
             fkQueries[i] = "ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + refColumnName +
-                    ") REFERENCES " + refs[i] + "(id)";
+                    ") REFERENCES " + refs[i].getTableName() + "(id)";
         }
         createTableQuery.append(')');
         Statement s = connection.createStatement();
