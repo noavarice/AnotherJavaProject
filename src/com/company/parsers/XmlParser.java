@@ -38,10 +38,6 @@ public class XmlParser {
 
     private static final int DEFAULT_NUMERIC_COLUMN_DISPERSION_PERCENTAGE = 10;
 
-    private static final String RESERVED_ID_NAME = "id";
-
-    private static final String FOREIGN_KEY_COLUMN_SUFFIX = "ID";
-
     private static SqlColumn[] getColumns(Element rootItem) throws
             XMLParseException
     {
