@@ -43,6 +43,7 @@ public class DataGenerator {
     {
         return RANDOM.nextGaussian() * mean * dispersion / 100.0 + mean;
     }
+
     private static Hashtable<String, ToDoubleBiFunction<Double, Double>> NUMERIC_TYPES = new Hashtable<String, ToDoubleBiFunction<Double, Double>>() {
         {
             put("integer", (mean, dispersion) -> (int)(getDistributedValue(mean, dispersion)));
