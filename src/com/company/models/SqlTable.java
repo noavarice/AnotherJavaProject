@@ -1,8 +1,5 @@
 package com.company.models;
 
-import java.util.Collection;
-import java.util.Set;
-
 public class SqlTable {
     private String name;
 

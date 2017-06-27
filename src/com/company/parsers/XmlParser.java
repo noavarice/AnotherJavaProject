@@ -8,7 +8,6 @@ import org.xml.sax.SAXException;
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.*;
 import java.util.regex.Pattern;
 
