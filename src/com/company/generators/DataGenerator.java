@@ -50,8 +50,6 @@ public class DataGenerator {
         }
     };
 
-    private static final String FOREIGN_KEY_COLUMN_TYPE = "INTEGER NOT NULL";
-
     private static final Hashtable<String, String> ABSTRACT_TYPES_TO_DATABASE_TYPES = new Hashtable<String, String>() {
         {
             put("string", "VARCHAR(100) NOT NULL");
@@ -170,15 +168,28 @@ public class DataGenerator {
             values.append(",?");
         }
         Reference[] refs = table.getForeignKeys();
+        boolean allTablesExist = true;
+        for (Reference ref : refs) {
+            Statement s = connection.createStatement();
+            if (!s.executeQuery("SHOW TABLES LIKE '" + ref.getTableName() + "'").next()) {
+                allTablesExist = false;
+                break;
+            }
+        }
         int refsCount = refs.length;
-        int[] maxIdValues = new int[refs.length];
-        for (int i = 0; i < refsCount; ++i) {
-            columnNames.append(",").append(refs[i].getColumnName());
-            values.append(",?");
-            PreparedStatement s = connection.prepareStatement("SELECT MAX(id) FROM " + refs[i].getTableName());
-            ResultSet rs = s.executeQuery();
-            rs.next();
-            maxIdValues[i] = rs.getInt(1);
+        int[] maxIdValues;
+        if (!allTablesExist) {
+            maxIdValues = null;
+        } else {
+            maxIdValues = new int[refs.length];
+            for (int i = 0; i < refsCount; ++i) {
+                columnNames.append(",").append(refs[i].getColumnName());
+                values.append(",?");
+                PreparedStatement s = connection.prepareStatement("SELECT MAX(id) FROM " + refs[i].getTableName());
+                ResultSet rs = s.executeQuery();
+                rs.next();
+                maxIdValues[i] = rs.getInt(1);
+            }
         }
         int mean = table.getMean();
         double dispersion = table.getDispersionPercentage();
@@ -197,14 +208,16 @@ public class DataGenerator {
                     s.setObject(j + 1, NON_NUMERIC_TYPES.get(columns[j].getColumnType()).get());
                 }
             }
-            for (int j = 0; j < refsCount; ++j) {
-                s.setObject(nonRefColumnsCount + j + 1, GET_FOREIGN_KEY.apply(maxIdValues[j]));
+            if (allTablesExist) {
+                for (int j = 0; j < refsCount; ++j) {
+                    s.setObject(nonRefColumnsCount + j + 1, GET_FOREIGN_KEY.apply(maxIdValues[j]));
+                }
             }
             if (s.executeUpdate() == 0) {
-                result = false;
+                throw new SQLException("Cannot insert another row");
             }
         }
-        return result;
+        return true;
     }
 
     private static boolean databaseExists(Connection connection, String databaseName) throws
@@ -227,22 +240,40 @@ public class DataGenerator {
                     .append(' ')
                     .append(ABSTRACT_TYPES_TO_DATABASE_TYPES.get(column.getColumnType()));
         }
-        Reference[] refs = table.getForeignKeys();
-        int refsCount = refs.length;
-        String[] fkQueries = new String[refsCount];
-        for (int i = 0; i < refsCount; ++i) {
-            String refColumnName = refs[i].getColumnName();
-            createTableQuery.append(',').append(refColumnName).append(' ').append(FOREIGN_KEY_COLUMN_TYPE);
-            fkQueries[i] = "ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + refColumnName +
-                    ") REFERENCES " + refs[i].getTableName() + "(id)";
+        for (Reference r : table.getForeignKeys()) {
+            createTableQuery.append(',').append(r.getColumnName()).append(' ').append("INTEGER");
         }
         createTableQuery.append(')');
         Statement s = connection.createStatement();
         s.executeUpdate(createTableQuery.toString());
-        for (String query : fkQueries) {
-            s.executeUpdate(query);
-        }
         s.close();
+    }
+
+    private static void fillForeignKeys(Connection connection, SqlTable table) throws
+            SQLException
+    {
+        Statement temp = connection.createStatement();
+        Reference[] refs = table.getForeignKeys();
+        int refCount = refs.length;
+        int[] maxId = new int[refCount];
+        for (int i = 0; i < refCount; ++i) {
+            maxId[i] = temp.executeQuery("SELECT MAX(id) FROM " + refs[i].getTableName()).getInt(1);
+        }
+        String tableName = table.getTableName();
+        int rowCount = temp.executeQuery("SELECT COUNT(*) FROM " + tableName).getInt(1);
+        temp.close();
+        StringBuilder updateQuery = new StringBuilder("UPDATE " + tableName + " SET ");
+        for (Reference ref : refs) {
+            updateQuery.append(ref.getColumnName()).append("=?,");
+        }
+        updateQuery.deleteCharAt(updateQuery.length() - 1);
+        PreparedStatement ps = connection.prepareStatement(updateQuery.toString());
+        for (int i = 0; i < rowCount; ++i) {
+            for (int max : maxId) {
+                ps.setInt(i + 1, GET_FOREIGN_KEY.apply(max));
+            }
+            ps.executeUpdate();
+        }
     }
 
     public static void generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
@@ -255,10 +286,6 @@ public class DataGenerator {
     {
         SqlDatabase database = XmlParser.fromFile(tableDeclarationFilePath);
         SqlTable[] tables = database.getDatabaseTables();
-        if (isCycledTableDeclaration(tables)) {
-            throw new DatabaseGenerationException("Tables are declared cyclically");
-        }
-        SqlTable[] orderedTables = getTablesInOrderOfCreation(tables);
         Properties props = new Properties();
         props.load(new FileInputStream(new File(connectionPropertiesFilePath)));
         MysqlDataSource ds = new MysqlDataSource();
@@ -274,14 +301,25 @@ public class DataGenerator {
         Statement s = conn.createStatement();
         s.executeUpdate("CREATE DATABASE " + databaseName);
         s.executeUpdate("USE " + databaseName);
-        s.close();
+        SqlTable[] orderedTables = getTablesInOrderOfCreation(tables);
         boolean result = true;
+        HashSet<SqlTable> notCreatedTables = new HashSet<>();
         for (SqlTable t : orderedTables) {
             createTableScheme(conn, t);
             result = fillTable(conn, t);
             if (!result) {
-                break;
+                notCreatedTables.add(t);
             }
+        }
+        for (SqlTable t : notCreatedTables) {
+            fillForeignKeys(conn, t);
+        }
+        for (SqlTable t : tables) {
+            String tableName = t.getTableName();
+             for (Reference r : t.getForeignKeys()) {
+                 s.executeUpdate("ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + r.getColumnName()
+                         + ") REFERENCES " + r.getTableName() + "(id)");
+             }
         }
         if (result) {
             conn.commit();
