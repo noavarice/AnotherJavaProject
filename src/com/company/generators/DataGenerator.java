@@ -126,7 +126,15 @@ public class DataGenerator {
         int currentItemIndex = 0;
         int itemsCount = temp.size();
         int lastItemIndex = itemsCount - 1;
+        HashSet<SqlTable> tablesSet = new HashSet<>();
         while (currentItemIndex < lastItemIndex) {
+            SqlTable t = temp.get(currentItemIndex);
+            if (tablesSet.contains(t)) {
+                ++currentItemIndex;
+                continue;
+            } else {
+                tablesSet.add(t);
+            }
             int i = lastItemIndex;
             final int index = currentItemIndex;
             Set<String> refNames = new HashSet<String>() {
