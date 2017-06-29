@@ -7,6 +7,7 @@ import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -132,6 +133,7 @@ public class XmlParser {
             XMLSignatureException,
             XMLParseException
     {
+        System.out.println("Parsing file...");
         DOMParser parser = new DOMParser();
         parser.parse(filePath);
         Document doc = parser.getDocument();

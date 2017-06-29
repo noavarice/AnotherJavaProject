@@ -7,6 +7,7 @@ import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -165,7 +166,8 @@ public class DataGenerator {
             IOException,
             SAXException,
             XMLParseException,
-            XMLSignatureException, SQLException {
+            XMLSignatureException, SQLException
+    {
         SqlDatabase database = XmlParser.fromFile(tableDeclarationFilePath);
         Properties props = new Properties();
         props.load(new FileInputStream(new File(connectionPropertiesFilePath)));
@@ -181,11 +183,13 @@ public class DataGenerator {
                 throw new DatabaseGenerationException("Database \"" + databaseName + "\" already exists");
             }
             Statement s = conn.createStatement();
+            System.out.println("Database generating has started");
             s.executeUpdate("CREATE DATABASE " + databaseName);
             s.executeUpdate("USE " + databaseName);
             SqlTable[] tables = database.getDatabaseTables();
             conn.setAutoCommit(false);
             for (SqlTable t : tables) {
+                System.out.println("Generating \"" + t.getTableName() + "\" table..");
                 createTableScheme(conn, t);
                 if (!fillTable(conn, t)) {
                     conn.rollback();
@@ -193,6 +197,7 @@ public class DataGenerator {
                     return false;
                 }
             }
+            System.out.println("Linking tables..");
             for (SqlTable t : tables) {
                 if (!fillForeignKeys(conn, t)) {
                     conn.rollback();
@@ -209,10 +214,14 @@ public class DataGenerator {
             }
             conn.commit();
         } catch (SQLException e) {
+            System.out.println(e.getMessage());
             conn.rollback();
+            System.out.println("Aborting transaction..");
             return false;
         } finally {
-            conn.close();
+            if (conn != null) {
+                conn.close();
+            }
         }
         return true;
     }
