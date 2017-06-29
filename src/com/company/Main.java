@@ -12,7 +12,7 @@ public class Main {
             System.out.println("Invalid arguments count");
         }
         try {
-            DataGenerator.generateDatabase(args[0], args[1]);
+            System.out.println(DataGenerator.generateDatabase(args[0], args[1]) ? "Database was generated" : "Database was not generated");
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }

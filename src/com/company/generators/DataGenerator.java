@@ -160,14 +160,12 @@ public class DataGenerator {
         return true;
     }
 
-    public static void generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
+    public static boolean generateDatabase(String connectionPropertiesFilePath, String tableDeclarationFilePath) throws
             DatabaseGenerationException,
             IOException,
             SAXException,
-            SQLException,
             XMLParseException,
-            XMLSignatureException
-    {
+            XMLSignatureException, SQLException {
         SqlDatabase database = XmlParser.fromFile(tableDeclarationFilePath);
         Properties props = new Properties();
         props.load(new FileInputStream(new File(connectionPropertiesFilePath)));
@@ -175,39 +173,47 @@ public class DataGenerator {
         ds.setServerName(props.getProperty("server"));
         ds.setUser(props.getProperty("username"));
         ds.setPassword(props.getProperty("password"));
-        Connection conn = ds.getConnection();
-        String databaseName = database.getDatabaseName();
-        if (databaseExists(conn, databaseName)) {
-            throw new DatabaseGenerationException("Database \"" + databaseName + "\" already exists");
-        }
-        Statement s = conn.createStatement();
-        s.executeUpdate("CREATE DATABASE " + databaseName);
-        s.executeUpdate("USE " + databaseName);
-        SqlTable[] tables = database.getDatabaseTables();
-        conn.setAutoCommit(false);
-        for (SqlTable t : tables) {
-            createTableScheme(conn, t);
-            if (!fillTable(conn, t)) {
-                conn.rollback();
-                conn.close();
-                return;
+        Connection conn = null;
+        try {
+            conn = ds.getConnection();
+            String databaseName = database.getDatabaseName();
+            if (databaseExists(conn, databaseName)) {
+                throw new DatabaseGenerationException("Database \"" + databaseName + "\" already exists");
             }
-        }
-        for (SqlTable t : tables) {
-            if (!fillForeignKeys(conn, t)) {
-                conn.rollback();
-                conn.close();
-                return;
+            Statement s = conn.createStatement();
+            s.executeUpdate("CREATE DATABASE " + databaseName);
+            s.executeUpdate("USE " + databaseName);
+            SqlTable[] tables = database.getDatabaseTables();
+            conn.setAutoCommit(false);
+            for (SqlTable t : tables) {
+                createTableScheme(conn, t);
+                if (!fillTable(conn, t)) {
+                    conn.rollback();
+                    conn.close();
+                    return false;
+                }
             }
-        }
-        for (SqlTable t : tables) {
-            String tableName = t.getTableName();
-            for (Reference r : t.getForeignKeys()) {
-                s.executeUpdate("ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + r.getColumnName()
-                        + ") REFERENCES " + r.getTableName() + "(id)");
+            for (SqlTable t : tables) {
+                if (!fillForeignKeys(conn, t)) {
+                    conn.rollback();
+                    conn.close();
+                    return false;
+                }
             }
+            for (SqlTable t : tables) {
+                String tableName = t.getTableName();
+                for (Reference r : t.getForeignKeys()) {
+                    s.executeUpdate("ALTER TABLE " + tableName + " ADD CONSTRAINT FOREIGN KEY (" + r.getColumnName()
+                            + ") REFERENCES " + r.getTableName() + "(id)");
+                }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            conn.rollback();
+            return false;
+        } finally {
+            conn.close();
         }
-        conn.commit();
-        conn.close();
+        return true;
     }
 }
