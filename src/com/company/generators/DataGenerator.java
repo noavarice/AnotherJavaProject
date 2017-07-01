@@ -166,7 +166,8 @@ public class DataGenerator {
             IOException,
             SAXException,
             XMLParseException,
-            XMLSignatureException, SQLException
+            XMLSignatureException,
+            SQLException
     {
         SqlDatabase database = XmlParser.fromFile(tableDeclarationFilePath);
         Properties props = new Properties();
@@ -214,9 +215,9 @@ public class DataGenerator {
             }
             conn.commit();
         } catch (SQLException e) {
-            System.out.println(e.getMessage());
+            System.out.println(e.getMessage() + "Aborting transaction..");
             conn.rollback();
-            System.out.println("Aborting transaction..");
+            conn.createStatement().executeUpdate("DROP DATABASE " + database.getDatabaseName());
             return false;
         } finally {
             if (conn != null) {
