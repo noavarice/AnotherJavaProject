@@ -1,4 +1,4 @@
-package com.company.models;
+package main.com.company.models;
 
 public class SqlTable {
     private String name;

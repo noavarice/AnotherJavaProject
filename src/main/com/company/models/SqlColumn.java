@@ -1,4 +1,4 @@
-package com.company.models;
+package main.com.company.models;
 
 public abstract class SqlColumn {
     private String name;

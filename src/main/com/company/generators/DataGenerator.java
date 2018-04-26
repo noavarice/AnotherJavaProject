@@ -1,13 +1,13 @@
-package com.company.generators;
+package main.com.company.generators;
 
 import com.company.models.*;
-import com.company.parsers.XmlParser;
+import main.com.company.models.*;
+import main.com.company.parsers.XmlParser;
 import com.mysql.cj.jdbc.MysqlDataSource;
 import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;

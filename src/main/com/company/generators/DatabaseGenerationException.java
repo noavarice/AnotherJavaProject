@@ -1,4 +1,4 @@
-package com.company.generators;
+package main.com.company.generators;
 
 public class DatabaseGenerationException extends Exception {
     public DatabaseGenerationException(String s) {

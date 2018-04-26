@@ -1,13 +1,12 @@
-package com.company.parsers;
+package main.com.company.parsers;
 
-import com.company.models.*;
 import com.sun.org.apache.xerces.internal.parsers.DOMParser;
+import main.com.company.models.*;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
 import javax.management.modelmbean.XMLParseException;
 import javax.xml.crypto.dsig.XMLSignatureException;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;

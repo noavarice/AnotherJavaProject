@@ -1,6 +1,6 @@
-package com.company;
+package main.com.company;
 
-import com.company.generators.DataGenerator;
+import main.com.company.generators.DataGenerator;
 
 public class Main {
 
